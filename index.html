@@ -1,1 +1,112 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+ <meta charset="UTF-8">
+ <title>Båtspill</title>
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+ <style>
+   body {
+     margin: 0;
+     padding: 0;
+     text-align: center;
+     background-color: #87ceeb;
+     font-family: Arial, sans-serif;
+   }
+
+   h1 {
+     margin-top: 10px;
+   }
+
+   canvas {
+     background-color: #1e90ff;
+     border: 3px solid black;
+     display: block;
+     margin: 10px auto;
+   }
+
+   button {
+     font-size: 20px;
+     padding: 10px 25px;
+     cursor: pointer;
+   }
+ </style>
+</head>
+<body>
+
+ <h1>Båtspill 🚤</h1>
+ <p>W = fremover · A / D = sving</p>
+
+ <button id="startBtn">Start spill</button>
+
+ <canvas id="game" width="600" height="400"></canvas>
+
+ <script>
+   // Vent til hele siden er lastet
+   window.onload = () => {
+     const canvas = document.getElementById("game");
+     const ctx = canvas.getContext("2d");
+     const startBtn = document.getElementById("startBtn");
+
+     let running = false;
+
+     const boat = {
+       x: canvas.width / 2,
+       y: canvas.height / 2,
+       angle: 0,
+       speed: 0
+     };
+
+     const keys = {};
+
+     // Tastatur
+     window.addEventListener("keydown", (e) => {
+       keys[e.key.toLowerCase()] = true;
+     });
+
+     window.addEventListener("keyup", (e) => {
+       keys[e.key.toLowerCase()] = false;
+     });
+
+     startBtn.addEventListener("click", startGame);
+
+     function startGame() {
+       running = true;
+       boat.x = canvas.width / 2;
+       boat.y = canvas.height / 2;
+       boat.angle = 0;
+       requestAnimationFrame(gameLoop);
+     }
+
+     function update() {
+       boat.speed = keys["w"] ? 2 : 0;
+
+       if (keys["a"]) boat.angle -= 0.05;
+       if (keys["d"]) boat.angle += 0.05;
+
+       boat.x += Math.cos(boat.angle) * boat.speed;
+       boat.y += Math.sin(boat.angle) * boat.speed;
+
+       // Begrensninger
+       boat.x = Math.max(0, Math.min(canvas.width, boat.x));
+       boat.y = Math.max(0, Math.min(canvas.height, boat.y));
+     }
+
+     function drawBoat() {
+       ctx.save();
+       ctx.translate(boat.x, boat.y);
+       ctx.rotate(boat.angle);
+
+       ctx.beginPath();
+       ctx.moveTo(15, 0);
+       ctx.lineTo(-10, -10);
+       ctx.lineTo(-10, 10);
+       ctx.closePath();
+       ctx.fillStyle = "white";
+       ctx.fill();
+
+       ctx.restore();
+     }
+
+     function gameLoop
+       
