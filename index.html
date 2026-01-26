@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enkelt Båtspill</title>
+    <title>Båtspill med Speedometer</title>
     <style>
         body {
             margin: 0;
@@ -26,6 +26,17 @@
             border-radius: 5px;
             pointer-events: none;
         }
+        #speedometer {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 24px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 12px 18px;
+            border-radius: 5px;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -36,6 +47,8 @@
         ⬇️ Pil ned: Brems / Rygg<br>
         ⬅️ ➡️ Piler: Sving
     </div>
+
+    <div id="speedometer">Fart: 0 km/t</div>
 
     <canvas id="gameCanvas"></canvas>
 
@@ -58,7 +71,7 @@
         ArrowRight: false
     };
 
-    // Hindre scrolling med piltaster
+    // Hindre scrolling
     window.addEventListener('keydown', (e) => {
         if (keys.hasOwnProperty(e.code)) {
             e.preventDefault();
@@ -79,12 +92,10 @@
         y: canvas.height / 2,
         angle: -Math.PI / 2,
         speed: 0,
-        maxSpeed: 6,
+        maxSpeed: 6, // 6 tilsvarer 1000 km/t
         acceleration: 0.1,
         friction: 0.98,
-        rotationSpeed: 0.06,
-        width: 20,
-        height: 40
+        rotationSpeed: 0.06
     };
 
     const particles = [];
@@ -97,6 +108,15 @@
             life: 1.0,
             size: Math.random() * 3 + 1
         });
+    }
+
+    function updateSpeedometer() {
+        const speedElement = document.getElementById("speedometer");
+
+        // Skaler speed til km/t
+        const kmh = Math.abs((boat.speed / boat.maxSpeed) * 1000);
+
+        speedElement.textContent = "Fart: " + kmh.toFixed(0) + " km/t";
     }
 
     function update() {
@@ -170,6 +190,7 @@
 
     function gameLoop() {
         update();
+        updateSpeedometer();
         draw();
         requestAnimationFrame(gameLoop);
     }
