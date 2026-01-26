@@ -1,200 +1,181 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enkelt Båtspill</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden; /* Fjerner rullefelt */
-            background-color: #333;
-            font-family: Arial, sans-serif;
-        }
-        canvas {
-            display: block;
-            background-color: #006994; /* Havfarge */
-        }
-        #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            font-size: 18px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 5px;
-            pointer-events: none;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enkelt Båtspill</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #333;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+            background-color: #006994;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+        }
+    </style>
 </head>
 <body>
- 
-    <div id="ui">
-        <strong>Kontroller:</strong><br>
-        ⬆️ Pil opp: Gi gass<br>
-        ⬇️ Pil ned: Brems / Rygg<br>
-        ⬅️ ➡️ Piler: Sving
-    </div>
- 
-    <canvas id="gameCanvas"></canvas>
- 
+
+    <div id="ui">
+        <strong>Kontroller:</strong><br>
+        ⬆️ Pil opp: Gi gass<br>
+        ⬇️ Pil ned: Brems / Rygg<br>
+        ⬅️ ➡️ Piler: Sving
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
 <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
- 
-    // Tilpass canvas til vinduets størrelse
-    function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
- 
-    // Tastaturhåndtering
-    const keys = {
-        ArrowUp: false,
-        ArrowDown: false,
-        ArrowLeft: false,
-        ArrowRight: false
-    };
- 
-    window.addEventListener('keydown', (e) => {
-        if (keys.hasOwnProperty(e.code)) keys[e.code] = true;
-    });
- 
-    window.addEventListener('keyup', (e) => {
-        if (keys.hasOwnProperty(e.code)) keys[e.code] = false;
-    });
- 
-    // Båt-objektet
-    const boat = {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-        angle: -Math.PI / 2, // Starter pekende oppover
-        speed: 0,
-        maxSpeed: 6,
-        acceleration: 0.1,
-        friction: 0.98, // Vannmotstand (hvor fort den stopper)
-        rotationSpeed: 0.06,
-        width: 20,
-        height: 40
-    };
- 
-    // Partikler for kjølvann (skum bak båten)
-    const particles = [];
- 
-    function createParticle() {
-        // Legg til partikkel bak båten
-        const offset = 20; // Hvor langt bak båten
-        particles.push({
-            x: boat.x - Math.cos(boat.angle) * offset + (Math.random() - 0.5) * 5,
-            y: boat.y - Math.sin(boat.angle) * offset + (Math.random() - 0.5) * 5,
-            life: 1.0, // Levetid (opasitet)
-            size: Math.random() * 3 + 1
-        });
-    }
- 
-    function update() {
-        // Svinging (kun hvis båten beveger seg litt)
-        if (Math.abs(boat.speed) > 0.1) {
-            // Snu motsatt vei hvis man rygger for mer naturlig følelse
-            const direction = boat.speed > 0 ? 1 : -1;
-            
-            if (keys.ArrowLeft) boat.angle -= boat.rotationSpeed * direction;
-            if (keys.ArrowRight) boat.angle += boat.rotationSpeed * direction;
-        }
- 
-        // Akselerasjon
-        if (keys.ArrowUp) {
-            boat.speed += boat.acceleration;
-        } else if (keys.ArrowDown) {
-            boat.speed -= boat.acceleration;
-        }
- 
-        // Friksjon (vannmotstand)
-        boat.speed *= boat.friction;
- 
-        // Oppdater posisjon basert på vinkel og fart
-        boat.x += Math.cos(boat.angle) * boat.speed;
-        boat.y += Math.sin(boat.angle) * boat.speed;
- 
-        // Skjerm-wrap (hvis du kjører ut av skjermen, kommer du inn på andre siden)
-        if (boat.x > canvas.width) boat.x = 0;
-        if (boat.x < 0) boat.x = canvas.width;
-        if (boat.y > canvas.height) boat.y = 0;
-        if (boat.y < 0) boat.y = canvas.height;
- 
-        // Lag kjølvann hvis båten har fart
-        if (Math.abs(boat.speed) > 1) {
-            createParticle();
-        }
- 
-        // Oppdater partikler
-        for (let i = particles.length - 1; i >= 0; i--) {
-            particles[i].life -= 0.02; // Partikkelen forsvinner sakte
-            if (particles[i].life <= 0) {
-                particles.splice(i, 1);
-            }
-        }
-    }
- 
-    function draw() {
-        // Tøm skjermen
-        ctx.fillStyle = '#006994'; // Havfarge
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
- 
-        // Tegn noen enkle "øyer" eller steiner for referanse
-        ctx.fillStyle = '#2e8b57'; // Sjøgrønn
-        ctx.beginPath();
-        ctx.arc(200, 200, 40, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(canvas.width - 200, canvas.height - 300, 60, 0, Math.PI * 2);
-        ctx.fill();
- 
-        // Tegn kjølvann (partikler)
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        particles.forEach(p => {
-            ctx.globalAlpha = p.life;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        ctx.globalAlpha = 1.0;
- 
-        // Tegn Båten
-        ctx.save(); // Lagre nåværende canvas-status
-        ctx.translate(boat.x, boat.y); // Flytt nullpunkt til båtens posisjon
-        ctx.rotate(boat.angle); // Roter canvas til båtens vinkel
- 
-        // Båtkroppen
-        ctx.fillStyle = '#d4af37'; // Gull/Tre farge
-        ctx.beginPath();
-        // Tegn en spiss båtform
-        ctx.moveTo(15, 0);       // Spissen foran
-        ctx.lineTo(-15, 10);     // Bak venstre
-        ctx.lineTo(-10, 0);      // Innhuk bak
-        ctx.lineTo(-15, -10);    // Bak høyre
-        ctx.closePath();
-        ctx.fill();
- 
-        // En liten detalj (vindu/motor)
-        ctx.fillStyle = '#8b4513';
-        ctx.fillRect(-10, -5, 10, 10);
- 
-        ctx.restore(); // Gjenopprett canvas-status (slik at ikke alt annet roterer)
-    }
- 
-    function gameLoop() {
-        update();
-        draw();
-        requestAnimationFrame(gameLoop);
-    }
- 
-    // Start spillet
-    gameLoop();
- 
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Tastaturhåndtering
+    const keys = {
+        ArrowUp: false,
+        ArrowDown: false,
+        ArrowLeft: false,
+        ArrowRight: false
+    };
+
+    // Hindre scrolling med piltaster
+    window.addEventListener('keydown', (e) => {
+        if (keys.hasOwnProperty(e.code)) {
+            e.preventDefault();
+            keys[e.code] = true;
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (keys.hasOwnProperty(e.code)) {
+            e.preventDefault();
+            keys[e.code] = false;
+        }
+    });
+
+    // Båt-objektet
+    const boat = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        angle: -Math.PI / 2,
+        speed: 0,
+        maxSpeed: 6,
+        acceleration: 0.1,
+        friction: 0.98,
+        rotationSpeed: 0.06,
+        width: 20,
+        height: 40
+    };
+
+    const particles = [];
+
+    function createParticle() {
+        const offset = 20;
+        particles.push({
+            x: boat.x - Math.cos(boat.angle) * offset + (Math.random() - 0.5) * 5,
+            y: boat.y - Math.sin(boat.angle) * offset + (Math.random() - 0.5) * 5,
+            life: 1.0,
+            size: Math.random() * 3 + 1
+        });
+    }
+
+    function update() {
+        if (Math.abs(boat.speed) > 0.1) {
+            const direction = boat.speed > 0 ? 1 : -1;
+            if (keys.ArrowLeft) boat.angle -= boat.rotationSpeed * direction;
+            if (keys.ArrowRight) boat.angle += boat.rotationSpeed * direction;
+        }
+
+        if (keys.ArrowUp) boat.speed += boat.acceleration;
+        else if (keys.ArrowDown) boat.speed -= boat.acceleration;
+
+        boat.speed *= boat.friction;
+
+        boat.x += Math.cos(boat.angle) * boat.speed;
+        boat.y += Math.sin(boat.angle) * boat.speed;
+
+        if (boat.x > canvas.width) boat.x = 0;
+        if (boat.x < 0) boat.x = canvas.width;
+        if (boat.y > canvas.height) boat.y = 0;
+        if (boat.y < 0) boat.y = canvas.height;
+
+        if (Math.abs(boat.speed) > 1) createParticle();
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].life -= 0.02;
+            if (particles[i].life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#006994';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#2e8b57';
+        ctx.beginPath();
+        ctx.arc(200, 200, 40, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(canvas.width - 200, canvas.height - 300, 60, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
+
+        ctx.save();
+        ctx.translate(boat.x, boat.y);
+        ctx.rotate(boat.angle);
+
+        ctx.fillStyle = '#d4af37';
+        ctx.beginPath();
+        ctx.moveTo(15, 0);
+        ctx.lineTo(-15, 10);
+        ctx.lineTo(-10, 0);
+        ctx.lineTo(-15, -10);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#8b4513';
+        ctx.fillRect(-10, -5, 10, 10);
+
+        ctx.restore();
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
 </script>
+
 </body>
 </html>
