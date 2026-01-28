@@ -3,251 +3,294 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Båtspill</title>
+    <title>Båtspill med Stor Verden</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #333; font-family: Arial, sans-serif; }
-        canvas { display: block; background-color: #006994; }
-        #ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 14px; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 5px; pointer-events: none; }
-        #speedometer { position: absolute; top: 20px; right: 20px; color: white; font-size: 24px; font-weight: bold; background: rgba(0, 0, 0, 0.5); padding: 12px 18px; border-radius: 5px; pointer-events: none; border: 2px solid white;}
-        #error-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: red; background: white; padding: 20px; display: none; z-index: 100; font-weight: bold;}
+        
+        /* Canvas dekker hele skjermen */
+        canvas { display: block; width: 100vw; height: 100vh; background-color: #006994; }
+ 
+        /* UI som ligger OPPÅ spillet (overlay) */
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Lar oss klikke gjennom UI hvis nødvendig */
+        }
+ 
+        #controls-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+ 
+        #speedometer {
+            position: absolute;
+            top: 20px;
+            right: 20px; /* Plassert i hjørnet av skjermen */
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 20px;
+            border-radius: 30px; /* Mer sporty look */
+            border: 2px solid white;
+            font-family: 'Courier New', Courier, monospace;
+        }
+ 
+        #minimap-text {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.7);
+        }
     </style>
 </head>
 <body>
  
-<div id="ui">
-    <strong>Kontroller:</strong><br>
-    Pil opp: Gi gass<br>
-    Pil ned: Brems / Rygg<br>
-    Pil venstre/høyre: Sving
+<div id="ui-container">
+    <div id="controls-info">
+        <strong>Kontroller:</strong><br>
+        ⬆️ Gass<br>
+        ⬇️ Brems / Rygg<br>
+        ⬅️ ➡️ Sving
+    </div>
+    <div id="speedometer">0 km/t</div>
+    <div id="minimap-text">Utforsk verdenen (3000x3000px)</div>
 </div>
  
-<div id="speedometer">0 km/t</div>
-<div id="error-msg">Noe gikk galt med koden! Sjekk konsollen (F12).</div>
 <canvas id="gameCanvas"></canvas>
  
 <script>
-    // Vi legger alt i en try-catch for å fange opp feil
-    try {
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+ 
+    // VERDEN OG KAMERA OPPSETT
+    const worldWidth = 3000;
+    const worldHeight = 3000;
+    
+    // Kamera starter i 0,0
+    const camera = { x: 0, y: 0 };
+ 
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+ 
+    // INPUT
+    const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+    window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = true; });
+    window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.code)) keys[e.code] = false; });
+ 
+    // GENERER TILFELDIGE ØYER
+    const islands = [];
+    // Lager 30 tilfeldige øyer spredt utover den store verdenen
+    for (let i = 0; i < 30; i++) {
+        islands.push({
+            x: Math.random() * worldWidth,
+            y: Math.random() * worldHeight,
+            radius: Math.random() * 60 + 30, // Radius mellom 30 og 90
+            color: Math.random() > 0.5 ? '#228b22' : '#2e8b57' // Litt variasjon i grønnfarge
+        });
+    }
+ 
+    // BÅT
+    const boat = {
+        x: worldWidth / 2, // Start midt i verden
+        y: worldHeight / 2,
+        angle: -Math.PI / 2,
+        speed: 0,
+        maxSpeed: 8,
+        acceleration: 0.1,
+        friction: 0.985,
+        rotationSpeed: 0.06,
+        radius: 15
+    };
+ 
+    const particles = [];
+ 
+    // Funksjon for å lage kjølvann
+    function createParticle() {
+        const offset = 22;
+        const spread = 2; 
+        particles.push({
+            x: boat.x - Math.cos(boat.angle) * offset + (Math.random()-0.5)*spread,
+            y: boat.y - Math.sin(boat.angle) * offset + (Math.random()-0.5)*spread,
+            life: 1.0,
+            size: Math.random() * 4 + 2
+        });
+    }
+ 
+    function update() {
+        // --- BÅT FYSIKK ---
+        if (Math.abs(boat.speed) > 0.1) {
+            const dir = boat.speed > 0 ? 1 : -1;
+            if (keys.ArrowLeft) boat.angle -= boat.rotationSpeed * dir;
+            if (keys.ArrowRight) boat.angle += boat.rotationSpeed * dir;
+        }
+        if (keys.ArrowUp) boat.speed += boat.acceleration;
+        else if (keys.ArrowDown) boat.speed -= boat.acceleration;
+ 
+        boat.speed *= boat.friction;
+        boat.x += Math.cos(boat.angle) * boat.speed;
+        boat.y += Math.sin(boat.angle) * boat.speed;
+ 
+        // --- BEGRENS BÅT TIL VERDEN (IKKE WRAP AROUND LENGER) ---
+        // Stopper båten hvis den treffer kanten av kartet
+        if (boat.x < 0) { boat.x = 0; boat.speed = 0; }
+        if (boat.x > worldWidth) { boat.x = worldWidth; boat.speed = 0; }
+        if (boat.y < 0) { boat.y = 0; boat.speed = 0; }
+        if (boat.y > worldHeight) { boat.y = worldHeight; boat.speed = 0; }
+ 
+        // --- KAMERA LOGIKK ---
+        // Kamera skal være sentrert på båten: Båtens posisjon minus halvparten av skjermen
+        camera.x = boat.x - canvas.width / 2;
+        camera.y = boat.y - canvas.height / 2;
+ 
+        // (Valgfritt) Ikke la kamera gå utenfor verdenen (så vi ikke ser svart bakgrunn)
+        // Fjern disse 4 linjene hvis du vil at båten alltid skal være midt på skjermen uansett
+        if (camera.x < 0) camera.x = 0;
+        if (camera.y < 0) camera.y = 0;
+        if (camera.x > worldWidth - canvas.width) camera.x = worldWidth - canvas.width;
+        if (camera.y > worldHeight - canvas.height) camera.y = worldHeight - canvas.height;
+ 
+        // --- KOLLISJONER ---
+        islands.forEach(island => {
+            const dx = boat.x - island.x;
+            const dy = boat.y - island.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < island.radius + boat.radius) {
+                boat.speed = -boat.speed * 0.5; // Sprett tilbake
+                const angle = Math.atan2(dy, dx);
+                const push = (island.radius + boat.radius) - dist + 2;
+                boat.x += Math.cos(angle) * push;
+                boat.y += Math.sin(angle) * push;
+            }
+        });
+ 
+        // --- PARTIKLER ---
+        if (Math.abs(boat.speed) > 1) createParticle();
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].life -= 0.02;
+            if (particles[i].life <= 0) particles.splice(i, 1);
+        }
+ 
+        // --- UI OPPDATERING ---
+        const kmh = Math.abs((boat.speed / boat.maxSpeed) * 100);
+        document.getElementById("speedometer").innerText = kmh.toFixed(0) + " km/t";
+    }
+ 
+    function draw() {
+        // Nullstill skjerm
+        ctx.fillStyle = '#006994';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 
+        // --- START KAMERA MODUS ---
+        // Alt vi tegner mellom save() og restore() vil bli flyttet basert på kameraet
+        ctx.save();
+        ctx.translate(-camera.x, -camera.y);
+ 
+        // 1. Tegn Rutenett (Grid) på vannet
+        // Dette hjelper oss å se farten når det ikke er øyer i nærheten
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.lineWidth = 2;
+        const gridSize = 100;
         
-        // Juster størrelse på lerretet
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+        // Finn ut hvor rutenettet skal starte og slutte basert på kamera for ytelse
+        const startX = Math.floor(camera.x / gridSize) * gridSize;
+        const startY = Math.floor(camera.y / gridSize) * gridSize;
+        const endX = startX + canvas.width + gridSize;
+        const endY = startY + canvas.height + gridSize;
+ 
+        ctx.beginPath();
+        for (let x = startX; x < endX; x += gridSize) {
+            ctx.moveTo(x, startY);
+            ctx.lineTo(x, endY);
         }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
- 
-        const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
- 
-        window.addEventListener('keydown', (e) => {
-            if (keys.hasOwnProperty(e.code)) {
-                e.preventDefault();
-                keys[e.code] = true;
-            }
-        });
- 
-        window.addEventListener('keyup', (e) => {
-            if (keys.hasOwnProperty(e.code)) {
-                e.preventDefault();
-                keys[e.code] = false;
-            }
-        });
- 
-        // Øyer
-        const islands = [
-            { x: 200, y: 200, radius: 50, color: '#2e8b57' },
-            { x: 800, y: 500, radius: 80, color: '#228b22' },
-            { x: 500, y: 300, radius: 35, color: '#3cb371' },
-            { x: 1000, y: 200, radius: 60, color: '#2e8b57' },
-            { x: 300, y: 600, radius: 45, color: '#228b22' }
-        ];
- 
-        // Båt
-        const boat = {
-            x: canvas.width / 2,
-            y: canvas.height / 2,
-            angle: -Math.PI / 2,
-            speed: 0,
-            maxSpeed: 7, 
-            acceleration: 0.15,
-            friction: 0.98,
-            rotationSpeed: 0.07,
-            radius: 15
-        };
- 
-        const particles = [];
-        const waterWaves = [];
- 
-        // Generer bølger
-        for(let i=0; i<50; i++) {
-            waterWaves.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
-                speed: Math.random() * 0.5 + 0.1
-            });
+        for (let y = startY; y < endY; y += gridSize) {
+            ctx.moveTo(startX, y);
+            ctx.lineTo(endX, y);
         }
+        ctx.stroke();
  
-        function createParticle() {
-            const offset = 25;
-            particles.push({
-                x: boat.x - Math.cos(boat.angle + 0.3) * offset,
-                y: boat.y - Math.sin(boat.angle + 0.3) * offset,
-                life: 1.0,
-                size: Math.random() * 3 + 2
-            });
-            particles.push({
-                x: boat.x - Math.cos(boat.angle - 0.3) * offset,
-                y: boat.y - Math.sin(boat.angle - 0.3) * offset,
-                life: 1.0,
-                size: Math.random() * 3 + 2
-            });
-        }
+        // 2. Tegn verdensgrenser (en rød linje rundt kartet)
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 5;
+        ctx.strokeRect(0, 0, worldWidth, worldHeight);
  
-        function updateSpeedometer() {
-            const speedElement = document.getElementById("speedometer");
-            if(speedElement) {
-                const kmh = Math.abs((boat.speed / boat.maxSpeed) * 120);
-                speedElement.textContent = kmh.toFixed(0) + " km/t";
-            }
-        }
- 
-        function checkCollisions() {
-            islands.forEach(island => {
-                const dx = boat.x - island.x;
-                const dy = boat.y - island.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
- 
-                if (distance < island.radius + boat.radius) {
-                    // Sprett tilbake
-                    boat.speed = -boat.speed * 0.6;
-                    
-                    // Dytt ut
-                    const angle = Math.atan2(dy, dx);
-                    const pushOutDist = (island.radius + boat.radius) - distance + 2;
-                    boat.x += Math.cos(angle) * pushOutDist;
-                    boat.y += Math.sin(angle) * pushOutDist;
-                }
-            });
-        }
- 
-        function update() {
-            if (Math.abs(boat.speed) > 0.1) {
-                const direction = boat.speed > 0 ? 1 : -1;
-                if (keys.ArrowLeft) boat.angle -= boat.rotationSpeed * direction;
-                if (keys.ArrowRight) boat.angle += boat.rotationSpeed * direction;
-            }
- 
-            if (keys.ArrowUp) boat.speed += boat.acceleration;
-            else if (keys.ArrowDown) boat.speed -= boat.acceleration;
- 
-            boat.speed *= boat.friction;
- 
-            boat.x += Math.cos(boat.angle) * boat.speed;
-            boat.y += Math.sin(boat.angle) * boat.speed;
- 
-            if (boat.x > canvas.width) boat.x = 0;
-            if (boat.x < 0) boat.x = canvas.width;
-            if (boat.y > canvas.height) boat.y = 0;
-            if (boat.y < 0) boat.y = canvas.height;
- 
-            checkCollisions();
- 
-            if (Math.abs(boat.speed) > 1) createParticle();
- 
-            for (let i = particles.length - 1; i >= 0; i--) {
-                particles[i].life -= 0.03;
-                if (particles[i].life <= 0) particles.splice(i, 1);
-            }
- 
-            waterWaves.forEach(wave => {
-                wave.x += wave.speed;
-                if (wave.x > canvas.width) wave.x = 0;
-            });
-        }
- 
-        function draw() {
-            ctx.fillStyle = '#006994';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
- 
-            // Bølger
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-            waterWaves.forEach(wave => {
-                ctx.fillRect(wave.x, wave.y, 20, 2);
-            });
- 
-            // Øyer
-            islands.forEach(island => {
+        // 3. Tegn Øyer
+        islands.forEach(island => {
+            // Sjekk om øya er synlig i kameraet før vi tegner (optimalisering)
+            if (island.x + island.radius > camera.x && 
+                island.x - island.radius < camera.x + canvas.width &&
+                island.y + island.radius > camera.y &&
+                island.y - island.radius < camera.y + canvas.height) {
+                
                 ctx.fillStyle = island.color;
                 ctx.beginPath();
                 ctx.arc(island.x, island.y, island.radius, 0, Math.PI * 2);
                 ctx.fill();
+                // Strandkant
                 ctx.strokeStyle = '#e0cda7';
                 ctx.lineWidth = 5;
                 ctx.stroke();
-            });
+            }
+        });
  
-            // Partikler
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-            particles.forEach(p => {
-                ctx.globalAlpha = p.life;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-            ctx.globalAlpha = 1.0;
- 
-            // Båt
-            ctx.save();
-            ctx.translate(boat.x, boat.y);
-            ctx.rotate(boat.angle);
- 
-            ctx.fillStyle = '#ffffff';
+        // 4. Tegn Partikler
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        particles.forEach(p => {
+            ctx.globalAlpha = p.life;
             ctx.beginPath();
-            ctx.moveTo(20, 0);
-            ctx.lineTo(-15, 12);
-            ctx.lineTo(-15, -12);
-            ctx.closePath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
             ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
  
-            ctx.fillStyle = '#ff0000';
-            ctx.beginPath();
-            ctx.moveTo(10, 0);
-            ctx.lineTo(-15, 8);
-            ctx.lineTo(-15, -8);
-            ctx.closePath();
-            ctx.fill();
+        // 5. Tegn Båten
+        ctx.translate(boat.x, boat.y);
+        ctx.rotate(boat.angle);
  
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-18, -6, 5, 12);
- 
-            ctx.fillStyle = '#87CEEB';
-            ctx.beginPath();
-            ctx.moveTo(5, 0);
-            ctx.lineTo(-5, 6);
-            ctx.lineTo(-5, -6);
-            ctx.fill();
- 
-            ctx.restore();
-        }
- 
-        function gameLoop() {
-            update();
-            updateSpeedometer();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
- 
-        // Start spillet
-        gameLoop();
+        // Skrog
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(20, 0);
+        ctx.lineTo(-15, 12);
+        ctx.lineTo(-15, -12);
+        ctx.closePath();
+        ctx.fill();
         
-    } catch (error) {
-        // Hvis noe feiler, vis feilmelding på skjermen
-        console.error(error);
-        document.getElementById("error-msg").style.display = "block";
-        document.getElementById("error-msg").textContent = "Feil i koden: " + error.message;
+        // Stripe
+        ctx.fillStyle = '#ff4444'; 
+        ctx.fillRect(-5, -5, 10, 10);
+ 
+        // Vindu
+        ctx.fillStyle = '#87CEEB';
+        ctx.beginPath();
+        ctx.moveTo(5, 0);
+        ctx.lineTo(-5, 6);
+        ctx.lineTo(-5, -6);
+        ctx.fill();
+ 
+        // --- SLUTT KAMERA MODUS ---
+        ctx.restore();
     }
+ 
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
 </script>
  
 </body>
