@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Båtspill med Speedometer</title>
+    <title>Båtspill med Speedometer og Kollisjon</title>
     <style>
         body {
             margin: 0;
@@ -59,6 +59,10 @@
     function resizeCanvas() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+
+        // Oppdater øy-posisjon som er avhengig av canvas-størrelse
+        islands[1].x = canvas.width - 200;
+        islands[1].y = canvas.height - 300;
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
@@ -95,8 +99,15 @@
         maxSpeed: 6, // 6 tilsvarer 1000 km/t
         acceleration: 0.1,
         friction: 0.98,
-        rotationSpeed: 0.06
+        rotationSpeed: 0.06,
+        radius: 10 // brukt til kollisjon
     };
+
+    // Øyer (land)
+    const islands = [
+        { x: 200, y: 200, r: 40 },
+        { x: canvas.width - 200, y: canvas.height - 300, r: 60 }
+    ];
 
     const particles = [];
 
@@ -112,11 +123,25 @@
 
     function updateSpeedometer() {
         const speedElement = document.getElementById("speedometer");
-
-        // Skaler speed til km/t
         const kmh = Math.abs((boat.speed / boat.maxSpeed) * 1000);
-
         speedElement.textContent = "Fart: " + kmh.toFixed(0) + " km/t";
+    }
+
+    function checkCollisionWithIslands() {
+        for (const island of islands) {
+            const dx = boat.x - island.x;
+            const dy = boat.y - island.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < island.r + boat.radius) {
+                // Flytt båten litt tilbake i motsatt retning av bevegelsen
+                boat.x -= Math.cos(boat.angle) * boat.speed;
+                boat.y -= Math.sin(boat.angle) * boat.speed;
+
+                // Stopp båten
+                boat.speed = 0;
+            }
+        }
     }
 
     function update() {
@@ -134,6 +159,10 @@
         boat.x += Math.cos(boat.angle) * boat.speed;
         boat.y += Math.sin(boat.angle) * boat.speed;
 
+        // Kollisjon med land
+        checkCollisionWithIslands();
+
+        // Wrap rundt skjermkant
         if (boat.x > canvas.width) boat.x = 0;
         if (boat.x < 0) boat.x = canvas.width;
         if (boat.y > canvas.height) boat.y = 0;
@@ -151,15 +180,15 @@
         ctx.fillStyle = '#006994';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Tegn øyer fra listen
         ctx.fillStyle = '#2e8b57';
-        ctx.beginPath();
-        ctx.arc(200, 200, 40, 0, Math.PI * 2);
-        ctx.fill();
+        for (const island of islands) {
+            ctx.beginPath();
+            ctx.arc(island.x, island.y, island.r, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
-        ctx.beginPath();
-        ctx.arc(canvas.width - 200, canvas.height - 300, 60, 0, Math.PI * 2);
-        ctx.fill();
-
+        // Bølger/partikler
         ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
         particles.forEach(p => {
             ctx.globalAlpha = p.life;
@@ -169,6 +198,7 @@
         });
         ctx.globalAlpha = 1.0;
 
+        // Tegn båt
         ctx.save();
         ctx.translate(boat.x, boat.y);
         ctx.rotate(boat.angle);
